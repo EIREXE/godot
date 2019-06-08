@@ -1,5 +1,3 @@
-export PATH=$PATH:/opt/devkitpro/devkitA64/bin:/opt/devkitpro/portlibs/switch/bin:/opt/devkitpro/tools/bin
-
 ###
 ## create template export directory
 mkdir -p ~/.local/share/godot/templates/3.1.1.stable/
@@ -8,7 +6,7 @@ mkdir -p ~/.local/share/godot/templates/3.1.1.stable/
 ###
 ## build switch release binary
 ###
-scons platform=switch tools=no target=release module_websocket_enabled=false module_upnp_enabled=no $@ -j8
+scons platform=switch target=release $@ -j8
 # copy binary to godot templates for switch export
 cp bin/switch_release.nro ~/.local/share/godot/templates/3.1.1.stable/
 

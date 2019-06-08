@@ -11,16 +11,19 @@ def get_name():
 
 def can_build():
     # Check the minimal dependencies
-    if not os.path.exists('/opt/devkitpro/devkitA64'):
-        print("devkitA64 not found.. switch disabled.")
+    if "DEVKITPRO" not in os.environ:
+        print("DEVKITPRO not defined in environment.. switch diabled.")
         return False
 
-    err = os.system("pkg-config --version > /dev/null")
-    if err:
+    if os.system("pkg-config --version > /dev/null"):
         print("pkg-config not found.. switch disabled.")
         return False
 
-    if not os.path.exists("/opt/devkitpro/portlibs/switch/bin/aarch64-none-elf-pkg-config"):
+    if not os.path.exists('{}/devkitA64'.format(os.environ.get('DEVKITPRO'))):
+        print("devkitA64 not found.. switch disabled.")
+        return False
+
+    if not os.path.exists("{}/portlibs/switch/bin/aarch64-none-elf-pkg-config".format(os.environ.get("DEVKITPRO"))):
         print("aarch64-none-elf-pkg-config not found.. switch disabled.")
         return False
     return True
@@ -30,37 +33,35 @@ def get_opts():
     from SCons.Variables import BoolVariable, EnumVariable
 
     return [
-        BoolVariable('use_llvm', 'Use the LLVM compiler', False),
-        BoolVariable('use_static_cpp', 'Link libgcc and libstdc++ statically for better portability', False),
         BoolVariable('use_sanitizer', 'Use LLVM compiler address sanitizer', False),
         BoolVariable('use_leak_sanitizer', 'Use LLVM compiler memory leaks sanitizer (implies use_sanitizer)', False),
-        BoolVariable('pulseaudio', 'Detect & use pulseaudio', True),
-        BoolVariable('udev', 'Use udev for gamepad connection callbacks', False),
         EnumVariable('debug_symbols', 'Add debugging symbols to release builds', 'yes', ('yes', 'no', 'full')),
         BoolVariable('separate_debug_symbols', 'Create a separate file containing debugging symbols', False),
         BoolVariable('touch', 'Enable touch events', True),
-        BoolVariable('execinfo', 'Use libexecinfo on systems where glibc is not available', False),
         ]
 
 def get_flags():
     return [
-            ('builtin_bullet', False),
-            ('builtin_enet', True), # Not in portlibs.
-            ('builtin_freetype', False),
-            ('builtin_libogg', False),
-            ('builtin_libpng', False),
-            ('builtin_libtheora', False),
-            ('builtin_libvorbis', False),
-            ('builtin_libvpx', False),
-            ('builtin_libwebp', False),
-            ('builtin_libwebsockets', True), # Not in portlibs.
-            ('builtin_mbedtls', False),
-            ('builtin_miniupnpc', True),
-            ('builtin_opus', False),
-            ('builtin_pcre2', False),
-            ('builtin_squish', True), # Not in portlibs.
-            ('builtin_zlib', False),
-            ('builtin_zstd', True) # Not in portlibs.
+        ("tools", False),
+        ('builtin_bullet', False),
+        ('builtin_enet', True), # Not in portlibs.
+        ('builtin_freetype', False),
+        ('builtin_libogg', False),
+        ('builtin_libpng', False),
+        ('builtin_libtheora', False),
+        ('builtin_libvorbis', False),
+        ('builtin_libvpx', False),
+        ('builtin_libwebp', False),
+        ('builtin_libwebsockets', True), # Not in portlibs.
+        ('builtin_mbedtls', False),
+        ('builtin_miniupnpc', True),
+        ('builtin_opus', False),
+        ('builtin_pcre2', False),
+        ('builtin_squish', True), # Not in portlibs.
+        ('builtin_zlib', False),
+        ('builtin_zstd', True), # Not in portlibs.
+        ('module_websocket_enabled', False),
+        ('module_upnp_enabled', False),
         ]
 
 
@@ -68,18 +69,24 @@ def configure(env):
     env["CC"] = "aarch64-none-elf-gcc"
     env["CXX"] = "aarch64-none-elf-g++"
     env["LD"] = "aarch64-none-elf-ld"
-    env["AR"] = "aarch64-none-elf-gcc"
 
     ## Build type
 
-    dkp = "/opt/devkitpro"
+    dkp = os.environ.get("DEVKITPRO")
     env['ENV']['DEVKITPRO'] = dkp
-    env['ENV']['PATH'] = os.environ['PATH'] + ":{}/portlibs/switch/bin:{}/devkitA64/bin".format(dkp,dkp) # This doesn't quite work....
+    updated_path = os.environ['PATH'] + ":{}/portlibs/switch/bin:{}/devkitA64/bin".format(dkp,dkp)
+    env['ENV']['PATH'] = updated_path
+    os.environ['PATH'] = updated_path  # os environment has to be updated for subprocess calls
 
     arch = ["-march=armv8-a", "-mtune=cortex-a57", "-mtp=soft", "-fPIE"]
     env.Prepend(CCFLAGS=arch + ['-ffunction-sections'])
-    env.Prepend(CPPFLAGS='-D__SWITCH__ -I {}/portlibs/switch/include -isystem {}/libnx/include -DPOSH_COMPILER_GCC -DPOSH_OS_HORIZON -DPOSH_OS_STRING=\\"horizon\\"'.format(dkp,dkp).split(" "))
-    env.Prepend(LINKFLAGS=arch + ['-specs={}/libnx/switch.specs'.format(dkp), '-L{}/portlibs/switch/lib'.format(dkp), '-L{}/libnx/lib'.format(dkp)])
+
+    env.Prepend(CPPPATH=['{}/portlibs/switch/include'.format(dkp)])
+    env.Prepend(CPPFLAGS=['-isystem', '{}/libnx/include'.format(dkp)])
+    env.Prepend(CPPFLAGS=['-D__SWITCH__', '-DPOSH_COMPILER_GCC', '-DPOSH_OS_HORIZON', '-DPOSH_OS_STRING=\\"horizon\\"'])
+
+    env.Append(LIBPATH=['{}/portlibs/switch/lib'.format(dkp), '{}/libnx/lib'.format(dkp)])
+    env.Prepend(LINKFLAGS=arch + ['-specs={}/libnx/switch.specs'.format(dkp)])
 
     if (env["target"] == "release"):
         # -O3 -ffast-math is identical to -Ofast. We need to split it out so we can selectively disable
@@ -222,32 +229,6 @@ def configure(env):
         env.ParseConfig('aarch64-none-elf-pkg-config libpcre2-32 --cflags --libs')
 
     ## Flags
-
-    if (os.system("aarch64-none-elf-pkg-config --exists alsa") == 0): # 0 means found
-        print("Enabling ALSA")
-        env.Append(CPPFLAGS=["-DALSA_ENABLED", "-DALSAMIDI_ENABLED"])
-        env.ParseConfig('aarch64-none-elf-pkg-config alsa --cflags --libs')
-    else:
-        print("ALSA libraries not found, disabling driver")
-
-    if env['pulseaudio']:
-        if (os.system("aarch64-none-elf-pkg-config --exists libpulse") == 0): # 0 means found
-            print("Enabling PulseAudio")
-            env.Append(CPPFLAGS=["-DPULSEAUDIO_ENABLED"])
-            env.ParseConfig('aarch64-none-elf-pkg-config --cflags --libs libpulse')
-        else:
-            print("PulseAudio development libraries not found, disabling driver")
-
-    if (platform.system() == "Linux"):
-        env.Append(CPPFLAGS=["-DJOYDEV_ENABLED"])
-
-        if env['udev']:
-            if (os.system("aarch64-none-elf-pkg-config --exists libudev") == 0): # 0 means found
-                print("Enabling udev support")
-                env.Append(CPPFLAGS=["-DUDEV_ENABLED"])
-                env.ParseConfig('aarch64-none-elf-pkg-config libudev --cflags --libs')
-            else:
-                print("libudev development libraries not found, disabling udev support")
 
     # Linkflags below this line should typically stay the last ones
     #if not env['builtin_zlib']:
