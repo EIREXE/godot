@@ -1,6 +1,8 @@
 version: AppVeyor build {build}
 image: Ubuntu
 environment:
+    matrix:
+        - APPVEYOR_SAVE_CACHE_ON_ERROR: true
     SCONS_CACHE_ROOT: "../scons_cache"
     SCONS_CACHE_LIMIT: 1024
 cache:
