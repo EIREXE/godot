@@ -1,0 +1,19 @@
+version: AppVeyor build {build}
+image: Ubuntu
+init:
+- mkdir ../resources
+- wget https://github.com/devkitPro/pacman/releases/download/devkitpro-pacman-1.0.1/devkitpro-pacman.deb -P ../resources
+install:
+- sudo dpkg -i ../resources/devkitpro-pacman.deb  
+- sudo pip install scons
+- sudo apt update
+- sudo apt-get install -y build-essential pkg-config libx11-dev libxcursor-dev libxinerama-dev libgl1-mesa-dev libglu-dev libasound2-dev libpulse-dev libfreetype6-dev libssl-dev libudev-dev libxi-dev libxrandr-dev yasm
+- sudo dkp-pacman -S --noconfirm switch-dev switch-bulletphysics switch-pkg-config switch-freetype switch-libtheora switch-libvorbis switch-libvpx switch-libopus switch-opusfile switch-libwebp switch-libpcre2 switch-mesa
+build_script:
+- export DEVKITPRO=/opt/devkitpro
+- source /etc/profile.d/devkit-env.sh
+- scons platform=switch target=release tools=no debug_symbols=no verbose=yes module_websocket_enabled=no module_upnp_enabled=no -j2
+- zip -9 -r Godot-Switch-Template.zip bin/*
+
+artifacts:
+- path: Godot-Switch-Template.zip
