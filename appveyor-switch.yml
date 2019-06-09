@@ -1,12 +1,13 @@
 version: AppVeyor build {build}
 image: Ubuntu
 environment:
-    SCONS_CACHE_ROOT: "$HOME\\scons_cache"
+    SCONS_CACHE_ROOT: "../scons_cache"
     SCONS_CACHE_LIMIT: 1024
 cache:
 - "$SCONS_CACHE_ROOT"
 init:
 - mkdir ../resources
+- mkdir ../cache
 - wget https://github.com/devkitPro/pacman/releases/download/devkitpro-pacman-1.0.1/devkitpro-pacman.deb -P ../resources
 install:
 - sudo dpkg -i ../resources/devkitpro-pacman.deb  
